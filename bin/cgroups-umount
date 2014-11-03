@@ -1,0 +1,28 @@
+#!/bin/bash
+# inspired by canonical's cgroups-lite
+
+set -e
+
+if [ -z "$(grep /sys/fs/cgroup /proc/mounts)" ]; then
+    echo "already unmounted" >&2
+    exit 0
+fi
+
+if [ ! -e /proc/cgroups ]; then
+    echo "cgroups unsupported" >&2
+    exit 1
+fi
+
+if [ "$(echo $(cat /proc/cgroups | head -n 1))" != \
+        "#subsys_name hierarchy num_cgroups enabled" ]; then
+    echo "/proc/cgroups format not understood" >&2
+    exit 1
+fi
+
+for controller in $(tail -n +2 /proc/cgroups | grep -E "1$" | awk '{print $1}'); do
+    if [ -d "/sys/fs/cgroup/$controller" ]; then
+        umount "/sys/fs/cgroup/$controller" || true
+    fi
+done
+
+umount /sys/fs/cgroup

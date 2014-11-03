@@ -1,0 +1,104 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          spacemonkey-cgroups-setup
+# Required-Start:    $local_fs $remote_fs
+# Required-Stop:     $local_fs $remote_fs
+# Should-Start:
+# Should-Stop:
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Space Monkey cgroups initialization
+### END INIT INFO
+
+# inspired by canonical's cgroups-lite
+
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+
+# Service description and basic file names
+DESC="Space Monkey cgroups initialization"
+NAME=spacemonkey-cgroups-setup
+PID_FILE=/var/run/$NAME.pid
+SCRIPT_NAME=/etc/init.d/$NAME
+
+# Ensure cgroup stuff is installed, fail gracefully otherwise
+[ -x "/bin/cgroups-mount" ] && [ -x "/bin/cgroups-umount" ] || exit 0
+
+# Read configuration file if present
+[ -r /etc/default/$NAME ] && . /etc/default/$NAME
+
+# Load init variables
+. /lib/init/vars.sh
+
+# Load init functions
+# Requires lsb-base (>= 3.2-14)
+. /lib/lsb/init-functions
+
+do_start()
+{
+    if test -x /bin/cgroups-mount && test -d /sys/fs/cgroup; then
+        /bin/cgroups-mount
+    fi
+}
+
+do_stop()
+{
+    if test -x /bin/cgroups-umount; then
+        /bin/cgroups-umount
+    fi
+}
+
+do_status()
+{
+    if grep -q cgroup /proc/mounts; then
+        echo "cgroups mounted"
+        exit 0;
+    else
+        echo "cgroups not mounted"
+        exit 1;
+    fi
+}
+
+case "$1" in
+  start)
+    [ "$VERBOSE" != no ] && log_daemon_msg "Starting $DESC" "$NAME"
+    do_start
+    case "$?" in
+      0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+      2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+    esac
+    ;;
+  stop)
+    [ "$VERBOSE" != no ] && log_daemon_msg "Stopping $DESC" "$NAME"
+    do_stop
+    case "$?" in
+      0|1) [ "$VERBOSE" != no ] && log_end_msg 0 ;;
+      2) [ "$VERBOSE" != no ] && log_end_msg 1 ;;
+    esac
+    ;;
+  restart|force-reload)
+    log_daemon_msg "$Restarting $DESC" "$NAME"
+    do_stop
+    case "$?" in
+      0|1)
+        do_start
+        case "$?" in
+          0) log_end_msg 0 ;;
+          1) log_end_msg 1 ;; # Old process is still running
+          *) log_end_msg 1 ;; # Failed to start for other reason
+        esac
+        ;;
+      *)
+        log_end_msg 1 # Failed to stop
+        ;;
+    esac
+    ;;
+  status)
+    do_status && exit 0 || exit $?
+    ;;
+  *)
+    echo "Usage: $SCRIPT_NAME {start|stop|status|restart|force-reload}" >&2
+    exit 3
+    ;;
+esac
+
+exit 0

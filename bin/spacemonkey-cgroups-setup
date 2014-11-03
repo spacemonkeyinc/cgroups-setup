@@ -1,0 +1,118 @@
+#!/bin/bash
+#
+# This command simplifies writing cgroups setup scripts, which, until
+# cgroup-bin sorts out their configuration files in a clean cross-distro way,
+# we're kind of stuck with.
+#
+# -JT Olds <jt@spacemonkey.com>
+#
+# Copyright (C) 2012 Space Monkey, Inc.
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in
+# all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+#
+
+mount_options="$1"
+profile_setup="$2"
+pid_to_add="$3"
+next_arg="$4"
+
+if ! [ -f "$profile_setup" ] ||
+    [ "$(head -n 1 "$profile_setup" |grep "$(basename "$0")")" == "" ]; then
+  {
+    echo "invocation incorrect. spacemonkey-cgroups-setup is intended to be"
+    echo "used at the top of a small script like:"
+    echo
+    echo "  #!/usr/bin/spacemonkey-cgroups-setup <mountoptions>"
+    echo "  /bin/echo val > cgroup_variable"
+    echo
+    echo "e.g."
+    echo
+    echo "  #!/usr/bin/spacemonkey-cgroups-setup memory"
+    echo "  /bin/echo 64M > memory.limit_in_bytes"
+    echo
+    echo "got mount options: $mount_options"
+    echo "    setup script:  $profile_setup"
+  } >&2
+  exit 1
+fi
+
+cgroup_name="$(basename "$profile_setup")"
+
+if [ "$pid_to_add" == "" ] || [ "$next_arg" != "" ] ||
+    [ "$pid_to_add" == "--help" ]; then
+  {
+    echo "This program adds a process to the cgroup '$cgroup_name'"
+    echo "Usage: $profile_setup <pid>"
+  } >&2
+  exit 1
+fi
+
+if [ "$UID" != "0" ]; then
+  echo "error: must be run as root!" >&2
+  exit 1
+fi
+
+# bash's builtin echo doesn't check calls to write against errors. We want to
+# check for errors for when we write to cgroup filesystem files, so we
+# overwrite with /bin/echo, which does check
+echo() { /bin/echo "$@"; }
+export -f echo
+
+profile_setup="$(readlink -f "$profile_setup")"
+cgroup_mnt="$(mktemp -d)"
+if [ "$cgroup_mnt" == "" ]; then
+  echo "error: failed creating temporary directory" >&2
+  exit 1
+fi
+
+if [ "$mount_options" != "" ]; then
+  mount_options="-o$mount_options"
+fi
+
+if ! mount -t cgroup "$mount_options" "spacemonkey_cgroup_$cgroup_name" \
+    "$cgroup_mnt"; then
+  echo "error: failed mounting cgroup filesystem" >&2
+  exit 1
+fi
+
+cleanup() {
+  cd /
+  umount "$cgroup_mnt" && rmdir "$cgroup_mnt"
+}
+trap cleanup EXIT
+
+cgroup_path="$cgroup_mnt/spacemonkey/$cgroup_name"
+mkdir -p "$cgroup_path"
+
+if ! cd "$cgroup_path"; then
+  echo "error: failed to change into cgroup path" >&2
+  exit 1
+fi
+
+if ! { echo "$pid_to_add" > tasks; }; then
+  echo "error: failed moving pid to profile" >&2
+  exit 1
+fi
+
+bash -e "$profile_setup"
+status="$?"
+if ! [ "$status" = 0 ]; then
+    echo "error: failed setting up profile" >&2
+fi
+exit $status

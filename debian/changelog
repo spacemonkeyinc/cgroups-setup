@@ -1,0 +1,5 @@
+spacemonkey-cgroups-setup (0.1.0) wheezy; urgency=low
+
+  * Initial release
+
+ -- JT Olds <jt@spacemonkey.com>  Fri, 19 Oct 2012 20:41:06 -0600

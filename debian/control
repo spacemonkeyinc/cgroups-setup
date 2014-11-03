@@ -1,0 +1,17 @@
+Source: spacemonkey-cgroups-setup
+Section: admin
+Priority: optional
+Maintainer: JT Olds <jt@spacemonkey.com>
+Build-Depends: debhelper (>= 7.0.50~)
+Standards-Version: 3.9.3
+
+Package: spacemonkey-cgroups-setup
+Architecture: all
+Provides: cgroup-lite
+Conflicts: cgroup-lite, cgroup-bin
+Depends: ${misc:Depends}
+XB-Spacemonkey-Repo: devices
+Description: Tool for assisting in Space Monkey related cgroups configuration
+ Provides a tool which simplifies writing cgroups setup scripts, which,
+ until cgroup-bin sorts out their configuration files in a clean cross-
+ distro way, we're kind of stuck with.

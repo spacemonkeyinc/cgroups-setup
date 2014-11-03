@@ -1,0 +1,5 @@
+#!/usr/bin/spacemonkey-cgroups-setup memory
+
+echo 64M > memory.soft_limit_in_bytes
+echo 96M > memory.limit_in_bytes
+echo 128M > memory.memsw.limit_in_bytes

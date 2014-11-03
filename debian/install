@@ -1,0 +1,3 @@
+bin/spacemonkey-cgroups-setup   /usr/bin
+bin/cgroups-mount               /bin
+bin/cgroups-umount              /bin
